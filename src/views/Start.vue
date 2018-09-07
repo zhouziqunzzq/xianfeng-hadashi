@@ -8,10 +8,23 @@
         <button @click="onNextQuestionClicked">下一题</button>
 
         <CountDown
-                :time="90000"
+                :time="30000"
                 :callback="onCountdownFinish"
                 :trigger="countDownTrigger"
+                v-show="isCountingDown"
         />
+
+        <QQUserPopper
+                :nickname="awardNickname"
+                :qq="awardQQ"
+                v-show="!isCountingDown"
+        />
+        <button v-show="!isCountingDown"
+                @click="pickAwardUser"
+        >
+            再抽一次
+        </button>
+
         <div id="debug-input">
             <input id="message-input"
                    placeholder="Input message..."
@@ -29,10 +42,12 @@
     import CountDown from "../components/CountDown";
     import * as CQWebSocket from "cq-websocket";
     import QuestionPopper from "../components/QuestionPopper";
+    import QQUserPopper from "../components/QQUserPopper";
 
     export default {
         name: 'home',
         components: {
+            QQUserPopper,
             QuestionPopper,
             CountDown,
             HelloWorld
@@ -48,13 +63,49 @@
                     {q: "让我们抵制_____， 保护黑猫！", a: "音响", ACCount: 0},
                 ],
                 nowQuestionIndex: 0,
-                groupID: 774150811,
-                userInfo: {},
+                groupID: 300809441,
+                userInfoMap: new Map(),
+                awardNickname: "",
+                awardQQ: 0,
             }
         },
         methods: {
             onCountdownFinish() {
                 this.isCountingDown = false;
+                const context = {
+                    message_type: "group",
+                    group_id: this.groupID,
+                    message: "===时间到，答题结束===",
+                };
+                this.bot('send_msg', context);
+                this.pickAwardUser();
+            },
+            pickAwardUser() {
+                // Randomly pick award user
+                if (!this.questions[this.nowQuestionIndex].ACUserList ||
+                    this.questions[this.nowQuestionIndex].ACUserList === 0)
+                    return;
+                const l = this.questions[this.nowQuestionIndex].ACUserList.length;
+                const acList = this.questions[this.nowQuestionIndex].ACUserList;
+                const awardID = this.getRandom(l - 1);
+                // Show award user
+                this.awardQQ = acList[awardID];
+                this.awardNickname = this.userInfoMap.get(this.awardQQ).card ||
+                    this.userInfoMap.get(this.awardQQ).nickname;
+                // Send message
+                const context = {
+                    message_type: "group",
+                    group_id: this.groupID,
+                    message: "恭喜[CQ:at,qq=" + this.awardQQ + "] " + "中奖QwQ",
+                };
+                this.bot('send_msg', context);
+            },
+            resetAwardUser() {
+                this.awardQQ = 0;
+                this.awardNickname = "没有人中奖QAQ";
+            },
+            getRandom(maxNum) {
+                return Math.floor(Math.random() * (maxNum + 1));
             },
             onSendButtonClicked() {
                 if (this.inputMessage === "") return;
@@ -75,6 +126,7 @@
                     this.countDownTrigger = true;
                     setTimeout(() => this.countDownTrigger = false, 50);
                     this.isCountingDown = true;
+                    this.resetAwardUser();
                 }
             },
             broadcastQuestion() {
@@ -82,7 +134,7 @@
                     message_type: "group",
                     group_id: this.groupID,
                     message: "[CQ:face,id=13] 第" + (this.nowQuestionIndex + 1) + "题：\n"
-                        + this.questions[this.nowQuestionIndex].q,
+                        + this.questions[this.nowQuestionIndex].qy,
                 };
                 this.bot('send_msg', context);
             },
@@ -108,10 +160,13 @@
                         this.questions[this.nowQuestionIndex].ACUserList.push(context.user_id);
                         this.questions[this.nowQuestionIndex].ACCount++;
                         console.log(this.questions[this.nowQuestionIndex].ACUserList);
-
                         this.getUserInfo(this.groupID, context.user_id);
                     }
                 }
+            },
+            getUserAvatar(userID) {
+                //https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=0
+                return userID;
             },
             getUserInfo(groupID, userID) {
                 this.bot('get_group_member_info', {
@@ -120,12 +175,18 @@
                     no_cache: true,
                 })
                     .then(rst => {
-                        console.log(rst);
+                        // Save user info into map cache
+                        this.userInfoMap.set(userID, rst.data);
+                        console.log("rst: %O", rst);
+                        console.log("userInfoMap: %O", this.userInfoMap);
                     });
             }
         },
         mounted() {
-            this.bot = new CQWebSocket();
+            this.bot = new CQWebSocket({
+                host: "47.88.223.83",
+                port: 6700,
+            });
             this.bot
                 .on('socket.connecting', (wsType, attempts) => {
                     console.log('尝试第 %d 次连接 _(:з」∠)_', attempts)
@@ -144,7 +205,8 @@
                 });
             this.bot.connect();
             // Broadcast the first question
-            setTimeout(this.broadcastQuestion, 500);
+            setTimeout(this.broadcastQuestion, 2000);
+            this.resetAwardUser();
         },
     }
 </script>
