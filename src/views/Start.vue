@@ -59,12 +59,22 @@
                 countDownTrigger: false,
                 isCountingDown: true,
                 questions: [
-                    {q: "梨子是否会女装？", a: "是", ACCount: 0},
-                    {q: "让我们抵制_____， 保护黑猫！", a: "音响", ACCount: 0},
+                    {q: "让我们保护音响， 抵制_____！", a: "黑猫", ACCount: 0},
+                    {q: "让我们抵制黑猫， 保护_____！", a: "音响", ACCount: 0},
+                    {
+                        q: "在先锋网招新群对梨梨说\"梨子晚上早\"会得到什么回复？\n" +
+                            "A. 早上好 B. 中午好 C. 晚上好（请回复单个大写字母）",
+                        a: "A", ACCount: 0
+                    },
+                    {
+                        q: "人类的本质是什么？", a: "[CQ:face,id=175] 第4题：\r\n人类的本质是什么？",
+                        ACCount: 0
+                    },
                 ],
                 nowQuestionIndex: 0,
-                groupID: 300809441,
+                groupID: 774150811,
                 userInfoMap: new Map(),
+                userAvatarMap: new Map(),
                 awardNickname: "",
                 awardQQ: 0,
             }
@@ -83,7 +93,7 @@
             pickAwardUser() {
                 // Randomly pick award user
                 if (!this.questions[this.nowQuestionIndex].ACUserList ||
-                    this.questions[this.nowQuestionIndex].ACUserList === 0)
+                    this.questions[this.nowQuestionIndex].ACUserList.length === 0)
                     return;
                 const l = this.questions[this.nowQuestionIndex].ACUserList.length;
                 const acList = this.questions[this.nowQuestionIndex].ACUserList;
@@ -133,8 +143,8 @@
                 const context = {
                     message_type: "group",
                     group_id: this.groupID,
-                    message: "[CQ:face,id=13] 第" + (this.nowQuestionIndex + 1) + "题：\n"
-                        + this.questions[this.nowQuestionIndex].qy,
+                    message: "[CQ:face,id=175] 第" + (this.nowQuestionIndex + 1) + "题：\n"
+                        + this.questions[this.nowQuestionIndex].q,
                 };
                 this.bot('send_msg', context);
             },
@@ -161,11 +171,20 @@
                         this.questions[this.nowQuestionIndex].ACCount++;
                         console.log(this.questions[this.nowQuestionIndex].ACUserList);
                         this.getUserInfo(this.groupID, context.user_id);
+                        //this.getUserAvatar(context.user_id);
                     }
                 }
             },
             getUserAvatar(userID) {
                 //https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=0
+                this.loadImageAsync("https://q1.qlogo.cn/g?b=qq&nk=" + userID + "&s=0")
+                    .then(img => {
+                        this.userAvatarMap.set(userID, img);
+                        console.log("Avatar: %O", img);
+                    })
+                    .catch(e => {
+                        console.error(e);
+                    });
                 return userID;
             },
             getUserInfo(groupID, userID) {
@@ -180,7 +199,19 @@
                         console.log("rst: %O", rst);
                         console.log("userInfoMap: %O", this.userInfoMap);
                     });
-            }
+            },
+            loadImageAsync(url) {
+                return new Promise((resolve, reject) => {
+                    const image = new Image();
+                    image.onload = () => {
+                        resolve(image);
+                    };
+                    image.onerror = () => {
+                        reject(new Error('Could not load image at ' + url));
+                    };
+                    image.src = url;
+                });
+            },
         },
         mounted() {
             this.bot = new CQWebSocket({
